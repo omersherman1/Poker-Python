@@ -1,7 +1,5 @@
 from collections import deque
 from player import *
-from socketing import Socketing
-import threading
 
 class Board:
     def __init__(self, players):
@@ -164,16 +162,29 @@ class Board:
         for player in self.players:
             player.draw_hand(self.deck)
 
+    def get_board_status(self):
+        board_status_data = {
+            "Round": self.round_number,
+            "CurrentBet": self.current_bet,
+            "MinimumBet": self.minimum_bet,
+            "CurrentPlayer": self.current_player.name if self.current_player else None,
+            "CommunityCards": [{"Suit": card.suit, "Rank": card.rank, "isHidden": False} for card in self.community_cards],
+            "Players": [
+                {
+                    "Name": player.name,
+                    "Money": player.money,
+                    "Bet": player.bet,
+                    "Hand": [{"Suit": card.suit, "Rank": card.rank, "isHidden": False} for card in player.hand]
+                } for player in self.players
+            ]
+        }
+        return board_status_data
+
 def makequeue(players):
     queue = deque(players)
     return queue
 
 if __name__ == "__main__":
-
-    socketing = Socketing()
-    # Start the server in a separate thread
-    server_thread = threading.Thread(target=socketing.start_server)
-    server_thread.start()
     player_names = ["Player 1", "Player 2", "Player 3", "Player 4"]
 
     poker_game = Board(player_names)

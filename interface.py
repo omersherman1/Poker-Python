@@ -1,29 +1,6 @@
 import pygame
 import sys
-import random
-import socket
-from socketing import Socketing
-from server import *
 
-
-class ClientSocketing:
-    def __init__(self, server_address):
-        self.server_address = server_address
-        self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
-    def connect_to_server(self):
-        try:
-            self.client_socket.connect(self.server_address)
-            print("Connected to the server.")
-            # Send data to the server
-            message = "Hello, server!"
-            self.client_socket.sendall(message.encode())
-            # Receive data from the server
-            data = self.client_socket.recv(1024)
-            print("Received:", data.decode())
-        finally:
-            # Close the connection
-            self.client_socket.close()
 # Initialize Pygame
 pygame.init()
 
@@ -56,7 +33,7 @@ button_200 = pygame.Rect(screen_width // 2 - 75, screen_height - 200, 150, 40)
 button_1600 = pygame.Rect(screen_width // 2 - 75, screen_height - 300, 150, 40)
 
 # Load cloud image as the background
-cloud_background = pygame.image.load(r'F:\t\Downloads\10218915.jpg')  # Replace with your actual image file
+cloud_background = pygame.image.load(r'clouds.jpg')  # Replace with your actual image file
 cloud_background = pygame.transform.scale(cloud_background, (screen_width, screen_height))  # Adjust size as needed
 
 # Initialize player queue
@@ -109,12 +86,5 @@ while True:
 
     pygame.display.flip()
     pygame.time.Clock().tick(10)  # Adjust the frame rate as needed
-
-if __name__ == "__main__":
-    # Server address
-    server_address = ('127.0.0.1', 68)
-
-    Socketing = Socketing(server_address)
-    Socketing.connect_to_server()
 
 
