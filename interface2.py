@@ -1,3 +1,4 @@
+
 import json
 import requests
 import pygame
@@ -213,6 +214,7 @@ hand_card1_y = 720
 hand_card2_x = screen_width // 2 - card_width // 2 + 35
 hand_card2_y = 720
 
+
 community_card1 = (card_image_back)
 community_card2 = (card_image_back)
 community_card3 = (card_image_back)
@@ -228,8 +230,8 @@ for i in range(5):
 for i in range(index_community_cards):
     for w in range(4):
         for j in range(13):
-                if board_status_data["CommunityCards"][i]["Suit"] == suits[w] and board_status_data["CommunityCards"][i]["Rank"] == ranks[j]:
-                    community_arr[i]= cards_imgs_arr[w][j]
+            if board_status_data["CommunityCards"][i]["Suit"] == suits[w] and board_status_data["CommunityCards"][i]["Rank"] == ranks[j]:
+                community_arr[i]= cards_imgs_arr[w][j]
 
 community_card1= community_arr[0]
 community_card2= community_arr[1]
@@ -237,11 +239,17 @@ community_card3= community_arr[2]
 community_card4= community_arr[3]
 community_card5= community_arr[4]
 
-community_card1 = pygame.image.load(community_card1)
-community_card2=  pygame.image.load(community_card2)
-community_card3=  pygame.image.load(community_card3)
-community_card4=  pygame.image.load(community_card4)
-community_card5=  pygame.image.load(community_card5)
+if isinstance(community_card1, str):
+    community_card1 = pygame.image.load(community_card1)
+if isinstance(community_card2, str):
+    community_card2 = pygame.image.load(community_card2)
+if isinstance(community_card3, str):
+    community_card3 = pygame.image.load(community_card3)
+if isinstance(community_card4, str):
+    community_card4 = pygame.image.load(community_card4)
+if isinstance(community_card5, str):
+    community_card5 = pygame.image.load(community_card5)
+
 
 
 
