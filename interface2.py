@@ -279,6 +279,7 @@ profile1_surface = pygame.Surface((100, 100))
 profile1_surface.fill((224, 122, 95))
 profile1_surface.blit(profile1_image, (0, 0))
 profile1 = profile1_surface.convert_alpha()
+screen.blit(profile1, (700, 750))
 
 
 # Load profile2 image and resize it
@@ -297,6 +298,7 @@ profile3_surface = pygame.Surface((100, 100))
 profile3_surface.fill((	111, 78, 55))
 profile3_surface.blit(profile3_image_rotated, (0, 0))
 profile3 = profile3_surface.convert_alpha()
+screen.blit(profile3, (1075, 150))
 
 profile4_image = pygame.image.load(r'img_poker\profile4.png')
 profile4_image = pygame.transform.scale(profile4_image, (100, 100))
@@ -305,6 +307,7 @@ profile4_surface = pygame.Surface((100, 100))
 profile4_surface.fill((253, 255, 182))
 profile4_surface.blit(profile4_image_rotated, (0, 0))
 profile4 = profile4_surface.convert_alpha()
+screen.blit(profile4, (260,275))
 
 def send_board_status():
     # s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

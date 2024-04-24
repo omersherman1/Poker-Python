@@ -321,7 +321,6 @@ button_x = pygame.Rect(screen_width // 5 + 460, screen_height - 260, 50, 50)
 def draw_bet_input_field():
     pygame.draw.rect(screen, WHITE, bet_input_rect)
     bet_input_surface = text_input_font.render(bet_input, True, BLACK)
-    screen.blit(bet_input_surface, (bet_input_rect.x + 10, bet_input_rect.y + 10))sg
     pygame.draw.rect(screen, BLACK if bet_input_active else WHITE, bet_input_rect, 2)
 
 # Adjust the position of the confirm, cancel, and X buttonsgsg
