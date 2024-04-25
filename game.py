@@ -21,6 +21,13 @@ class Player:
         self.font = pygame.font.Font(None, 36)
         self.money_text = self.font.render(f"Money: {self.money}", True, (0, 0, 0))
         self.bet_text = self.font.render(f"Bet: {self.bet}", True, (0, 0, 0))
+        self.update_money_text()
+        self.update_bet_text
+
+    def update_money_text(self):
+        self.money_text = self.font.render(f"Money: {self.money}", True, (0, 0, 0))
+    def update_bet_text(self):
+        self.bet_text = self.font.render(f"Bet: {self.bet}", True, (0, 0, 0))
 
 class Board:
     def __init__(self, round_number, current_bet, minimum_bet, current_player, community_cards):
@@ -38,6 +45,7 @@ class Game:
         self.players = self.create_players()
         self.your_name = self.board_status_data["your_name"]
         self.current_player = self.board_status_data["CurrentPlayer"]
+        self.current_bet= self.board_status_data["CurrentBet"]
 
         self.screen_width, self.screen_height = 1920, 1000
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
@@ -77,8 +85,12 @@ class Game:
     def draw(self):
         self.screen.blit(self.cloud_background, (0, 0))
         self.screen.blit(self.table_surface, (self.table_x, self.table_y))
+        for i in range(6):
+            x = 500 + i * 10
+            y = 430
+            self.screen.blit(self.card_image_back, (x, y))
         for i, card in enumerate(self.board.community_cards):
-            x = 600 + i * 150
+            x = 725 + i * 150
             y = 430
             self.screen.blit(card.image, (x, y))
 
@@ -90,7 +102,7 @@ class Game:
             players_before_you = players_queue.popleft()
             players_queue.append(players_before_you)
 
-        arr = list(players_queue)
+
         i=0
         while players_queue:
             player = players_queue.popleft()
@@ -196,6 +208,8 @@ class Game:
                 bet_button_rect = pygame.Rect(action_button_x, action_button_y + 50, action_button_width, action_button_height)
 
             bet_button_rect = pygame.Rect(action_button_x, action_button_y + 50, action_button_width, action_button_height)
+            call_button_rect = pygame.Rect(action_button_x, action_button_y, action_button_width, action_button_height)
+
             if bet_button_rect.collidepoint(pygame.mouse.get_pos()):
                 if pygame.mouse.get_pressed()[0]:  # Left mouse button clicked
                     self.bet_button_clicked = True
@@ -215,25 +229,28 @@ class Game:
                 for event in pygame.event.get():
                     if event.type == pygame.KEYDOWN:
                         if event.key == pygame.K_RETURN:
-                       # Bet confirmed, process the bet amount
-                             self.bet_amount = int(self.bet_text)
-                             self.bet_button_clicked = False
-                             self.bet_text = ""  # Reset the bet text
-                        elif event.key == pygame.K_ESCAPE:
-                            # Cancel bet
-                             self.bet_button_clicked = False
-                             self.bet_text = ""  # Reset the bet text
-                             self.show_bet_options = False  # Set flag to hide typing space and buttons
+                            for player in self.players:
+                                if player.name == self.current_player:
+                                   bet_amount = int(self.bet_text)
+                                   player.bet = bet_amount+ player.bet
+                                   player.money -= bet_amount
+                                   self.bet_button_clicked = False
+                                   self.bet_text = ""
+                                   player.update_money_text()
+                                   player.update_bet_text()
+
+
+
                         elif event.key == pygame.K_BACKSPACE:
                            # Handle backspace - remove last character from bet_text
                              self.bet_text = self.bet_text[:-1]
                            # Handle typing of bet amount (numbers)
                         elif event.key in [pygame.K_0, pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4,
-                             pygame.K_5, pygame.K_6, pygame.K_7, pygame.K_8, pygame.K_9]:
-                             self.bet_text += event.unicode
-                             typed_number = int(self.bet_text + event.unicode)
-                             if typed_number >= self.board.minimum_bet and typed_number <= self.players[0].money:
-                                self.bet_text += event.unicode
+                              pygame.K_5, pygame.K_6, pygame.K_7, pygame.K_8, pygame.K_9]:
+                              typed_number = int(self.bet_text + event.unicode)
+                              if typed_number < self.players[0].money:
+                                  self.bet_text += event.unicode
+
 
                 # Draw "Confirm", "Cancel", and "All In" buttons
                 if self.show_bet_options:  # Only draw if flag is True
@@ -255,7 +272,38 @@ class Game:
                     # Handle click event on "Cancel" button
                     if cancel_button_rect.collidepoint(pygame.mouse.get_pos()):
                         if pygame.mouse.get_pressed()[0]:  # Left mouse button clicked
-                            self.show_bet_options = False  # Hide betting options
+                            self.bet_button_clicked = False
+                            self.bet_text = ""  # Reset the bet text
+
+                    if confirm_button_rect.collidepoint(pygame.mouse.get_pos()):
+                       if pygame.mouse.get_pressed()[0]:
+                          for player in self.players:
+                              if player.name == self.current_player:
+                                 bet_amount = int(self.bet_text)
+                                 player.bet = bet_amount+ player.bet
+                                 player.money -= bet_amount
+                                 self.bet_button_clicked = False
+                                 self.bet_text = ""
+                                 player.update_money_text()
+                                 player.update_bet_text()
+
+
+
+                    if all_in_button_rect.collidepoint(pygame.mouse.get_pos()):
+                       if pygame.mouse.get_pressed()[0]:
+                          for player in self.players:
+                              if player.name == self.current_player:
+                                 player.bet_amount = player.money
+                                 player.money = 0
+                                 self.bet_button_clicked = False
+                                 self.bet_text = ""
+                                 player.update_money_text()
+
+            if call_button_rect.collidepoint(pygame.mouse.get_pos()):
+               if pygame.mouse.get_pressed()[0]:  # Left mouse button clicked
+                   player.bet= self.current_bet
+                   player.money= player.money- self.current_bet
+
 
         pygame.display.flip()
 
