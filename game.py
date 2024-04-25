@@ -299,10 +299,6 @@ class Game:
                                  self.bet_text = ""
                                  player.update_money_text()
 
-            if call_button_rect.collidepoint(pygame.mouse.get_pos()):
-               if pygame.mouse.get_pressed()[0]:  # Left mouse button clicked
-                   player.bet= self.current_bet
-                   player.money= player.money- self.current_bet
 
 
         pygame.display.flip()
