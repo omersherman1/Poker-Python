@@ -1,4 +1,8 @@
+import json
+import socket
+import threading
 from collections import deque
+
 from player import *
 
 class Board:
@@ -20,7 +24,7 @@ class Board:
         # Check if it's the last bettor's turn again
         return all(player.bet == 0 or player == last_bettor for player in self.players)
 
-    def play_round(self):
+    def play_round(self, client_socket):
         self.players_in_round = deque([player for player in self.players if player.money > 0])
 
         print(f"\n--- Round {self.round_number} ---")
@@ -43,68 +47,63 @@ class Board:
                 self.deal_river()
                 self.display_board()
 
-            self.collect_bets()
+            self.collect_bets(client_socket)
 
         if self.round_number == 4:
             print(self.determine_winner().name)
 
-    def make_bet(self):
-        while True:
-            try:
-                print(f"{self.current_player.name}, your current money: {self.current_player.money}")
-                print(f"Previous bet: {self.current_bet}")
-                print("1. Fold\n2. Check\n3. Bet\n4. Call\n5. All-In")
-                choice = int(input("Enter your choice: "))
+    def make_bet(self, jsonFromClient):
+        choice = jsonFromClient["Action"]
+        bet_amount = jsonFromClient.get("bet", 0)
 
-                if choice == 1:
-                    # Fold
-                    self.current_player.bet = 0
-                    self.current_player.flag = False
-                    return 0
-                elif choice == 2:
-                    # Check
-                    if self.current_bet == 0:
-                        self.bet = 0  # Check
-                        self.current_player.flag = False
-                        return 0
-                    else:
-                        print("You can't check if a player has bet money. Please choose another option.")
-                        continue
-                elif choice == 3:
-                    # Bet
-                    bet_amount = int(input(f"Enter your bet (minimum: {self.minimum_bet}): "))
-                    if bet_amount >= self.minimum_bet and bet_amount <= self.current_player.money:
-                        self.current_player.bet = bet_amount
-                        self.current_player.money -= bet_amount
-                        self.current_player.flag = True
-                        return bet_amount
-                    else:
-                        print("Invalid bet amount.")
-                elif choice == 4:
-                    # Call
-                    if self.current_bet == 0:
-                        print("There is no bet to call. Please choose another option.")
-                        continue
-                    elif self.current_player.money >= self.current_bet:
-                        self.current_player.bet = self.current_bet  # Call
-                        self.current_player.money -= self.current_bet
-                        self.current_player.flag = False
-                        return self.current_bet
-                    else:
-                        print("Not enough money to call. Please choose another option.")
-                        continue
-                elif choice == 5:
-                    # All-In
-                    self.current_player.bet = self.current_player.money
-                    self.current_player.money = 0
-                    self.current_player.flag = True
-                    return self.current_player.bet
-                else:
-                    print("Invalid choice. Please enter a valid option.")
-            except ValueError:
-                print("Invalid input. Please enter a number.")
+        if choice == "Fold":
+            # Fold
+            self.current_player.bet = 0
+            self.current_player.flag = False
+            return 0
+        elif choice == "Check":
+            # Check
+            if self.current_bet == 0:
+                self.current_player.bet = 0  # Check
+                self.current_player.flag = False
+                return 0
+            else:
+                print("You can't check if a player has bet money. Please choose another option.")
+                return self.make_bet(jsonFromClient)  # ask again
+        elif choice == "Bet":
+            # Bet
+            if bet_amount >= self.minimum_bet and bet_amount <= self.current_player.money:
+                self.current_player.bet = bet_amount
+                self.current_player.money -= bet_amount
+                self.current_player.flag = True
+                return bet_amount
+            else:
+                print("Invalid bet amount.")
+                return self.make_bet(jsonFromClient)  # ask again
+        elif choice == "Call":
+            # Call
+            if self.current_bet == 0:
+                print("There is no bet to call. Please choose another option.")
+                return self.make_bet(jsonFromClient)  # ask again
+            elif self.current_player.money >= self.current_bet:
+                self.current_player.bet = self.current_bet  # Call
+                self.current_player.money -= self.current_bet
+                self.current_player.flag = False
+                return self.current_bet
+            else:
+                print("Not enough money to call. Please choose another option.")
+                return self.make_bet(jsonFromClient)  # ask again
+        elif choice == "All-In":
+            # All-In
+            self.current_player.bet = self.current_player.money
+            self.current_player.money = 0
+            self.current_player.flag = True
+            return self.current_player.bet
+        else:
+            print("Invalid choice. Please enter a valid option.")
+            return self.make_bet(jsonFromClient)  # ask again
 
-    def collect_bets(self):
+    def collect_bets(self, client_socket):
         players_checked = []
 
         self.minimum_bet = 50
@@ -114,7 +113,14 @@ class Board:
 
             if self.current_player.money > 0:
                 self.minimum_bet = max(self.current_bet, self.minimum_bet)
-                bet_made = self.make_bet()
+                data_for_client = self.send_board_to_client()
+                client_socket.sendall(json.dumps(data_for_client).encode())
+
+                # Receive the JSON data from the client
+                message = client_socket.recv(1024).decode()
+                json_from_client = json.loads(message)
+
+                bet_made = self.make_bet(json_from_client)
 
                 if bet_made != self.current_bet: # bet or raise (and of course, all in) were made
                     self.minimum_bet = bet_made + 50
@@ -141,6 +147,8 @@ class Board:
         self.community_cards.append(self.deck.draw_card())
 
     def display_board(self):
+        self.send_board_to_client()
+
         print("Community Cards:")
         for card in self.community_cards:
             print(str(card))
@@ -162,41 +170,70 @@ class Board:
         for player in self.players:
             player.draw_hand(self.deck)
 
-    def get_board_status(self):
-        board_status_data = {
-            "Round": self.round_number,
-            "CurrentBet": self.current_bet,
-            "MinimumBet": self.minimum_bet,
-            "CurrentPlayer": self.current_player.name if self.current_player else None,
-            "CommunityCards": [{"Suit": card.suit, "Rank": card.rank, "isHidden": False} for card in self.community_cards],
-            "Players": [
-                {
-                    "Name": player.name,
-                    "Money": player.money,
-                    "Bet": player.bet,
-                    "Hand": [{"Suit": card.suit, "Rank": card.rank, "isHidden": False} for card in player.hand]
-                } for player in self.players
-            ]
+    def send_board_to_client(self):
+        data_for_client = {
+            'CommunityCards': [],
+            'Players': []
         }
-        return board_status_data
 
-def makequeue(players):
-    queue = deque(players)
-    return queue
+        data_for_client["Current Player"] = self.current_player.name
+        data_for_client["Round"] = self.round_number
+        data_for_client["Current Bet"] = self.current_bet
+        data_for_client["Minimum Bet"] = self.minimum_bet
+
+        for card in self.community_cards:
+            data_for_client['CommunityCards'].append(card.__dict__())
+
+        for player in self.players:
+            data_for_client['Players'].append(player.__dict__())
+
+        return data_for_client
+
+
+class PokerGameServer:
+    def __init__(self, host, port):
+        self.host = host
+        self.port = port
+        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.server_socket.bind((self.host, self.port))
+        self.server_socket.listen(5)
+        self.clients = {}
+        self.board = Board(["Player1", "Player2", "Player3", "Player4"])
+
+    def handle_client(self, client_socket, client_address):
+        print(f"Connected by {client_address}")
+        Board.play_round(self.board, client_socket)
+        starting_board = Board.send_board_to_client(self.board)
+        client_socket.sendall(json.dumps(starting_board).encode())
+
+        while True:
+            try:
+                message = client_socket.recv(1024).decode()
+                if not message:
+                    break
+                jsonFromClient = json.loads(message)
+                if jsonFromClient["type"] == "bet":
+                    self.board.make_bet(jsonFromClient)
+                elif jsonFromClient["type"] == "check":
+                    self.board.make_bet({"Action": "Check"})
+                elif jsonFromClient["type"] == "fold":
+                    self.board.make_bet({"Action": "Fold"})
+                else:
+                    print("Invalid message type")
+            except Exception as e:
+                print(f"Error handling client: {e}")
+                break
+
+        print(f"Disconnected by {client_address}")
+        del self.clients[client_address]
+
+    def start(self):
+        print("Poker game server started")
+        while True:
+            client_socket, client_address = self.server_socket.accept()
+            self.clients[client_address] = client_socket
+            threading.Thread(target=self.handle_client, args=(client_socket, client_address)).start()
 
 if __name__ == "__main__":
-    player_names = ["Player 1", "Player 2", "Player 3", "Player 4"]
-
-    poker_game = Board(player_names)
-
-    queue = makequeue(poker_game.players)
-
-    while True:
-        poker_game.play_round()
-        # playerturn(queue)
-
-        # Check if any player is out of money
-        if any(player.money <= 0 for player in poker_game.players):
-            print("Game over!")
-            break
-        poker_game.round_number += 1  # Increment round number
+    server = PokerGameServer("localhost", 8000)
+    server.start()

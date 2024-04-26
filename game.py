@@ -1,7 +1,13 @@
+import ast
+import socket
+from time import sleep
+
 import pygame
 import sys
-from jsonListener import board_status_data
+# from Server.jsonListener import board_status_data
 from collections import deque
+import json
+
 
 class Card:
     def __init__(self, suit, rank):
@@ -10,24 +16,19 @@ class Card:
         self.path = f"img_poker\\{self.suit}{self.rank}.png"
         self.image = pygame.image.load(self.path)
 
+
 class Player:
     def __init__(self, name, money, bet, hand):
         self.name = name
         self.money = money
         self.bet = bet
-        self.hand = [Card(card["Suit"], card["Rank"]) for card in hand]
+        self.hand = [Card(card["suit"], card["rank"]) for card in hand]
         self.profile_path = f"img_poker\\{self.name}.png"
         self.profile = pygame.image.load(self.profile_path)
         self.font = pygame.font.Font(None, 36)
         self.money_text = self.font.render(f"Money: {self.money}", True, (0, 0, 0))
         self.bet_text = self.font.render(f"Bet: {self.bet}", True, (0, 0, 0))
-        self.update_money_text()
-        self.update_bet_text
 
-    def update_money_text(self):
-        self.money_text = self.font.render(f"Money: {self.money}", True, (0, 0, 0))
-    def update_bet_text(self):
-        self.bet_text = self.font.render(f"Bet: {self.bet}", True, (0, 0, 0))
 
 class Board:
     def __init__(self, round_number, current_bet, minimum_bet, current_player, community_cards):
@@ -37,15 +38,18 @@ class Board:
         self.current_player = current_player
         self.community_cards = [Card(card["Suit"], card["Rank"]) for card in community_cards]
 
+
 class Game:
     def __init__(self):
         pygame.init()  # Initialize Pygame here
-        self.board_status_data = board_status_data
+        self.board_status_data = {}
+        self.connect_to_server()
         self.board = self.create_board()
         self.players = self.create_players()
-        self.your_name = self.board_status_data["your_name"]
-        self.current_player = self.board_status_data["CurrentPlayer"]
-        self.current_bet= self.board_status_data["CurrentBet"]
+        # self.your_name = self.board_status_data["your_name"]
+        self.current_player = self.board_status_data["Current Player"]
+        self.last_action = None
+        self.last_bet_amount = 0
 
         self.screen_width, self.screen_height = 1920, 1000
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
@@ -54,6 +58,9 @@ class Game:
         self.cloud_background = pygame.image.load(r'clouds.jpg')
         self.cloud_background = pygame.transform.scale(self.cloud_background, (self.screen_width, self.screen_height))
         self.bet_button_clicked = False
+        self.call_button_clicked = False
+        self.fold_button_clicked = False
+        self.check_button_clicked = False
         self.bet_amount = 0  # Variable to store the bet amount
         self.bet_text = ""
         self.show_bet_options = True  # Flag to show/hide betting options
@@ -68,19 +75,20 @@ class Game:
         self.frame_thickness = 10
         self.frame_radius = 150
         self.table_surface = pygame.Surface((self.table_width, self.table_height), pygame.SRCALPHA)
-        pygame.draw.rect(self.table_surface, (48, 104, 68), (0, 0, self.table_width, self.table_height), border_radius=self.frame_radius)
+        pygame.draw.rect(self.table_surface, (48, 104, 68), (0, 0, self.table_width, self.table_height),
+                         border_radius=self.frame_radius)
 
     def create_board(self):
         round_number = self.board_status_data["Round"]
-        current_bet = self.board_status_data["CurrentBet"]
-        minimum_bet = self.board_status_data["MinimumBet"]
-        current_player = self.board_status_data["CurrentPlayer"]
+        current_bet = self.board_status_data["Current Bet"]
+        minimum_bet = self.board_status_data["Minimum Bet"]
+        current_player = self.board_status_data["Current Player"]
         community_cards = self.board_status_data["CommunityCards"]
         return Board(round_number, current_bet, minimum_bet, current_player, community_cards)
 
     def create_players(self):
         players_data = self.board_status_data["Players"]
-        return [Player(player["Name"], player["Money"], player["Bet"], player["Hand"]) for player in players_data]
+        return [Player(player["name"], player["money"], player["bet"], player["hand"]) for player in players_data]
 
     def draw(self):
         self.screen.blit(self.cloud_background, (0, 0))
@@ -94,16 +102,17 @@ class Game:
             y = 430
             self.screen.blit(card.image, (x, y))
 
+
         players_queue = deque()
         for player in self.players:
             players_queue.append(player)
 
-        while players_queue[0].name != self.your_name:
+        while players_queue[0].name != self.current_player:
             players_before_you = players_queue.popleft()
             players_queue.append(players_before_you)
 
-
-        i=0
+        arr = list(players_queue)
+        i = 0
         while players_queue:
             player = players_queue.popleft()
 
@@ -118,14 +127,11 @@ class Game:
                 profile1_surface.fill((0, 0, 128))
                 profile1_surface.blit(profile1_image, (0, 0))
                 profile1 = profile1_surface.convert_alpha()
-                self.screen.blit(profile1, (x+ self.card_width/2+15, y+150))
+                self.screen.blit(profile1, (x + self.card_width / 2 + 15, y + 150))
 
-                self.screen.blit(player.money_text, (x + self.card_width // 2 + 200, y+90 ))
-                self.screen.blit(player.bet_text, (x + self.card_width // 2 + 200, y+40 ))
-
-
-
-            elif i== 1:  # Right
+                self.screen.blit(player.money_text, (x + self.card_width // 2 + 200, y + 90))
+                self.screen.blit(player.bet_text, (x + self.card_width // 2 + 200, y + 40))
+            elif i == 1:  # Right
                 x = self.table_x + self.table_width - self.card_width - 20
                 y = self.table_y + self.table_height // 2 - self.card_height // 2
                 card1 = pygame.transform.rotate(self.card_image_back, 90)
@@ -135,17 +141,13 @@ class Game:
 
                 profile2_image = pygame.transform.scale(player.profile, (100, 100))
                 profile2_surface = pygame.Surface((100, 100))
-                profile2_surface.fill((	135, 206, 235))  # sky blue background
+                profile2_surface.fill((135, 206, 235))  # sky blue background
                 profile2_surface.blit(profile2_image, (0, 0))
                 profile2 = profile2_surface.convert_alpha()
-                self.screen.blit(profile2, (x+150, y))
+                self.screen.blit(profile2, (x + 150, y))
 
-                self.screen.blit(player.money_text, (x + self.card_width // 2-50 , y+250 ))
-                self.screen.blit(player.bet_text, (x + self.card_width // 2-50 , y+200 ))
-
-
-
-
+                self.screen.blit(player.money_text, (x + self.card_width // 2 - 50, y + 250))
+                self.screen.blit(player.bet_text, (x + self.card_width // 2 - 50, y + 200))
             elif i == 2:  # Top
                 x = self.table_x + self.table_width // 2 - self.card_width
                 y = self.table_y - self.card_height + self.card_height - 20
@@ -157,17 +159,10 @@ class Game:
                 profile3_surface.fill((111, 78, 55))
                 profile3_surface.blit(profile3_image, (0, 0))
                 profile3 = profile3_surface.convert_alpha()
-                self.screen.blit(profile3, (x+self.card_width//2 + 7.5, y-120))
+                self.screen.blit(profile3, (x + self.card_width // 2 + 7.5, y - 120))
 
-                self.screen.blit(player.money_text, (x + self.card_width // 2 - 220, y+100 ))
-                self.screen.blit(player.bet_text, (x + self.card_width // 2 - 220, y+50 ))
-
-
-
-
-
-
-
+                self.screen.blit(player.money_text, (x + self.card_width // 2 - 220, y + 100))
+                self.screen.blit(player.bet_text, (x + self.card_width // 2 - 220, y + 50))
             else:  # Left
                 x = self.table_x - 20
                 y = self.table_y + self.table_height // 2 - self.card_height // 2
@@ -181,15 +176,15 @@ class Game:
                 profile4_surface.fill((253, 255, 182))
                 profile4_surface.blit(profile4_image, (0, 0))
                 profile4 = profile4_surface.convert_alpha()
-                self.screen.blit(profile4, (x-130,y+10))
+                self.screen.blit(profile4, (x - 130, y + 10))
 
-                self.screen.blit(player.money_text, (x + self.card_width // 2 , y+250 ))
-                self.screen.blit(player.bet_text, (x + self.card_width // 2 , y+200 ))
+                self.screen.blit(player.money_text, (x + self.card_width // 2, y + 250))
+                self.screen.blit(player.bet_text, (x + self.card_width // 2, y + 200))
 
-            i = i+1
+            i = i + 1
 
-
-        if self.your_name == self.current_player:
+        # if self.your_name == self.current_player:
+        if True:
             action_button_width = 200
             action_button_height = 50
             action_button_x = 50
@@ -205,14 +200,30 @@ class Game:
                     center=(action_button_x + action_button_width // 2,
                             action_button_y + i * (action_button_height + 10) + action_button_height // 2))
                 self.screen.blit(text, text_rect)
-                bet_button_rect = pygame.Rect(action_button_x, action_button_y + 50, action_button_width, action_button_height)
+                bet_button_rect = pygame.Rect(action_button_x, action_button_y + 50, action_button_width,
+                                              action_button_height)
+
 
             bet_button_rect = pygame.Rect(action_button_x, action_button_y + 50, action_button_width, action_button_height)
             call_button_rect = pygame.Rect(action_button_x, action_button_y, action_button_width, action_button_height)
-
+            fold_button_rect = pygame.Rect(action_button_x, action_button_y+100, action_button_width, action_button_height)
+            check_button_rect = pygame.Rect(action_button_x, action_button_y+150, action_button_width, action_button_height)
             if bet_button_rect.collidepoint(pygame.mouse.get_pos()):
                 if pygame.mouse.get_pressed()[0]:  # Left mouse button clicked
                     self.bet_button_clicked = True
+            elif call_button_rect.collidepoint(pygame.mouse.get_pos()):
+                if pygame.mouse.get_pressed()[0]:  # Left mouse button
+                    self.call_button_clicked = True
+            elif fold_button_rect.collidepoint(pygame.mouse.get_pos()):
+                if pygame.mouse.get_pressed()[0]:  # Left mouse button
+                    self.fold_button_clicked = True
+            elif check_button_rect.collidepoint(pygame.mouse.get_pos()):
+                 if pygame.mouse.get_pressed()[0]:  # Left mouse button
+                    self.check_button_clicked = True
+
+
+
+
 
             if self.bet_button_clicked:
                 # Draw betting input field
@@ -228,28 +239,15 @@ class Game:
                 # Handle events for typing bet amount
                 for event in pygame.event.get():
                     if event.type == pygame.KEYDOWN:
-                        if event.key == pygame.K_RETURN:
-                            for player in self.players:
-                                if player.name == self.current_player:
-                                   bet_amount = int(self.bet_text)
-                                   player.bet = bet_amount+ player.bet
-                                   player.money -= bet_amount
-                                   self.bet_button_clicked = False
-                                   self.bet_text = ""
-                                   player.update_money_text()
-                                   player.update_bet_text()
-
-
-
-                        elif event.key == pygame.K_BACKSPACE:
-                           # Handle backspace - remove last character from bet_text
-                             self.bet_text = self.bet_text[:-1]
-                           # Handle typing of bet amount (numbers)
+                        if event.key == pygame.K_BACKSPACE:
+                            # Handle backspace - remove last character from bet_text
+                            self.bet_text = self.bet_text[:-1]
+                        # Handle typing of bet amount (numbers)
                         elif event.key in [pygame.K_0, pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4,
-                              pygame.K_5, pygame.K_6, pygame.K_7, pygame.K_8, pygame.K_9]:
-                              typed_number = int(self.bet_text + event.unicode)
-                              if typed_number < self.players[0].money:
-                                  self.bet_text += event.unicode
+                                           pygame.K_5, pygame.K_6, pygame.K_7, pygame.K_8, pygame.K_9]:
+                            typed_number = int(self.bet_text + event.unicode)
+                            if typed_number < self.players[0].money:
+                                self.bet_text += event.unicode
 
 
                 # Draw "Confirm", "Cancel", and "All In" buttons
@@ -276,32 +274,56 @@ class Game:
                             self.bet_text = ""  # Reset the bet text
 
                     if confirm_button_rect.collidepoint(pygame.mouse.get_pos()):
-                       if pygame.mouse.get_pressed()[0]:
-                          for player in self.players:
-                              if player.name == self.current_player:
-                                 bet_amount = int(self.bet_text)
-                                 player.bet = bet_amount+ player.bet
-                                 player.money -= bet_amount
-                                 self.bet_button_clicked = False
-                                 self.bet_text = ""
-                                 player.update_money_text()
-                                 player.update_bet_text()
+                        if pygame.mouse.get_pressed()[0]:
+                            bet_amount = int(self.bet_text)
+                            self.bet_button_clicked = False
+                            self.last_action = "Bet"  # Remember the last action
+                            self.last_bet_amount = bet_amount  # Remember the last bet amount
 
 
 
                     if all_in_button_rect.collidepoint(pygame.mouse.get_pos()):
-                       if pygame.mouse.get_pressed()[0]:
-                          for player in self.players:
-                              if player.name == self.current_player:
-                                 player.bet_amount = player.money
-                                 player.money = 0
-                                 self.bet_button_clicked = False
-                                 self.bet_text = ""
-                                 player.update_money_text()
+                        if pygame.mouse.get_pressed()[0]:
+                            self.bet_button_clicked = False
+                            self.last_action = "All-In"
 
+            elif self.call_button_clicked== True:
+                 self.call_button_clicked = False
+                 self.last_action= "Call"
 
+            elif self.fold_button_clicked:
+                 self.fold_button_clicked = False
+                 self.fold_action= "Fold"
+
+            elif self.fold_button_clicked:
+                 self.fold_button_clicked = False
+                 self.fold_action= "Check"
 
         pygame.display.flip()
+    def connect_to_server(self):
+        # Create a socket object
+        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+        # Connect to the server
+        server_address = ("localhost", 8000)  # Replace with your server's address and port
+        client_socket.connect(server_address)
+
+        response = client_socket.recv(1024).decode() # getting the board here
+        self.board_status_data = ast.literal_eval(response)
+        print(self.board_status_data)
+
+        client_socket.close()
+
+    def send_json_to_server(self, json_data):
+        try:
+            client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            server_address = ("localhost", 8000)  # Change to your server address
+            client_socket.connect(server_address)
+            message = json.dumps(json_data)
+            client_socket.sendall(message.encode())
+            client_socket.close()
+        except Exception as e:
+            print(f"Error sending JSON data to server: {e}")
 
     def run(self):
         clock = pygame.time.Clock()
@@ -310,11 +332,36 @@ class Game:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
-            self.draw()
+                self.draw()
+            if self.last_action:
+                if self.last_action == "Bet":
+                    json_data = {"Action": "Bet", "bet": self.last_bet_amount}
+                elif self.last_action == "All-In":
+                    json_data = {"Action": "All-In"}
+                elif self.last_action == "Call":
+                    json_data = {"Action": "Call"}
+                elif self.last_action == "Fold":
+                    json_data = {"Action": "Fold"}
+                elif self.last_action == "Check":
+                    json_data = {"Action": "Check"}
+
+                self.send_json_to_server(json_data)
+
+            # End of game loop
             clock.tick(60)
         pygame.quit()
         sys.exit()
 
+
 if __name__ == "__main__":
     game = Game()
     game.run()
+
+
+
+
+
+
+
+
+

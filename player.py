@@ -1,3 +1,4 @@
+import json
 import random
 
 class Player:
@@ -7,6 +8,9 @@ class Player:
         self.money = 10000
         self.bet = 0
         self.current_best_combination = []
+
+    def __dict__(self):
+        return {"name": self.name, "money": self.money, "bet": self.bet, "hand": [card.__dict__() for card in self.hand]}
 
     def draw_hand(self, deck):
         self.hand = [deck.draw_card() for _ in range(2)]
@@ -122,6 +126,7 @@ class Player:
                 return False
         return True
 
+
 class Card:
     def __init__(self, suit, rank):
         self.suit = suit
@@ -129,6 +134,9 @@ class Card:
 
     def __str__(self):
         return f"{self.rank} of {self.suit}"
+
+    def __dict__(self):
+        return {"rank": self.rank, "suit": self.suit}
 
 class Deck:
     def __init__(self):
