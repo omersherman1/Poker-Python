@@ -53,15 +53,15 @@ class Board:
             print(self.determine_winner().name)
 
     def make_bet(self, jsonFromClient):
-        choice = jsonFromClient["Action"]
+        choice = jsonFromClient["action"]
         bet_amount = jsonFromClient.get("bet", 0)
 
-        if choice == "Fold":
+        if choice == "fold":
             # Fold
             self.current_player.bet = 0
             self.current_player.flag = False
             return 0
-        elif choice == "Check":
+        elif choice == "check":
             # Check
             if self.current_bet == 0:
                 self.current_player.bet = 0  # Check
@@ -70,7 +70,7 @@ class Board:
             else:
                 print("You can't check if a player has bet money. Please choose another option.")
                 return self.make_bet(jsonFromClient)  # ask again
-        elif choice == "Bet":
+        elif choice == "bet":
             # Bet
             if bet_amount >= self.minimum_bet and bet_amount <= self.current_player.money:
                 self.current_player.bet = bet_amount
@@ -80,7 +80,7 @@ class Board:
             else:
                 print("Invalid bet amount.")
                 return self.make_bet(jsonFromClient)  # ask again
-        elif choice == "Call":
+        elif choice == "call":
             # Call
             if self.current_bet == 0:
                 print("There is no bet to call. Please choose another option.")
@@ -93,7 +93,7 @@ class Board:
             else:
                 print("Not enough money to call. Please choose another option.")
                 return self.make_bet(jsonFromClient)  # ask again
-        elif choice == "All-In":
+        elif choice == "all in":
             # All-In
             self.current_player.bet = self.current_player.money
             self.current_player.money = 0
@@ -172,7 +172,7 @@ class Board:
 
     def send_board_to_client(self):
         data_for_client = {
-            'CommunityCards': [],
+            'Community Cards': [],
             'Players': []
         }
 
@@ -182,7 +182,7 @@ class Board:
         data_for_client["Minimum Bet"] = self.minimum_bet
 
         for card in self.community_cards:
-            data_for_client['CommunityCards'].append(card.__dict__())
+            data_for_client['Community Cards'].append(card.__dict__())
 
         for player in self.players:
             data_for_client['Players'].append(player.__dict__())
@@ -202,27 +202,15 @@ class PokerGameServer:
 
     def handle_client(self, client_socket, client_address):
         print(f"Connected by {client_address}")
-        Board.play_round(self.board, client_socket)
-        starting_board = Board.send_board_to_client(self.board)
-        client_socket.sendall(json.dumps(starting_board).encode())
 
         while True:
-            try:
-                message = client_socket.recv(1024).decode()
-                if not message:
-                    break
-                jsonFromClient = json.loads(message)
-                if jsonFromClient["type"] == "bet":
-                    self.board.make_bet(jsonFromClient)
-                elif jsonFromClient["type"] == "check":
-                    self.board.make_bet({"Action": "Check"})
-                elif jsonFromClient["type"] == "fold":
-                    self.board.make_bet({"Action": "Fold"})
-                else:
-                    print("Invalid message type")
-            except Exception as e:
-                print(f"Error handling client: {e}")
+            self.board.play_round(client_socket)
+
+            # Check if any player is out of money
+            if any(player.money <= 0 for player in self.board.players):
+                print("Game over!")
                 break
+            self.board.round_number += 1  # Increment round number
 
         print(f"Disconnected by {client_address}")
         del self.clients[client_address]

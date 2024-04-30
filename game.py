@@ -1,4 +1,5 @@
 import ast
+import asyncio
 import socket
 from time import sleep
 
@@ -36,7 +37,96 @@ class Board:
         self.current_bet = current_bet
         self.minimum_bet = minimum_bet
         self.current_player = current_player
-        self.community_cards = [Card(card["Suit"], card["Rank"]) for card in community_cards]
+        self.community_cards = [Card(card["suit"], card["rank"]) for card in community_cards]
+
+
+class Button:
+    def __init__(self, x, y, width, height, text, color):
+        self.rect = pygame.Rect(x, y, width, height)
+        self.text = text
+        self.color = color
+        self.clicked = False
+
+    def draw(self, screen):
+        pygame.draw.rect(screen, self.color, self.rect, border_radius=10)
+        font = pygame.font.Font(None, 36)
+        text_surface = font.render(self.text, True, (255, 255, 255))
+        screen.blit(text_surface, (self.rect.x + self.rect.width // 3, self.rect.y + self.rect.height // 3.5))
+
+    def handle_event(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if self.rect.collidepoint(event.pos):
+                self.clicked = True
+        elif event.type == pygame.MOUSEBUTTONUP:
+            self.clicked = False
+
+    def is_clicked(self):
+        return self.clicked
+
+
+class Table:
+    def __init__(self, x, y, width, height, color):
+        self.rect = pygame.Rect(x, y, width, height)
+        self.color = color
+        self.table_surface = pygame.Surface((self.rect.width, self.rect.height), pygame.SRCALPHA)
+
+    def draw(self, screen):
+        pygame.draw.rect(self.table_surface, self.color, (0, 0, self.rect.width, self.rect.height), border_radius = 150)
+        screen.blit(self.table_surface, (self.rect.x, self.rect.y))
+
+
+class PlayerProfile:
+    def __init__(self, Player, x, y, back_card, color, your_name, index):
+        self.Player = Player
+        self.x = x
+        self.y = y
+        self.back_card = back_card
+        self.color = color
+        self.your_name = your_name
+        self.index = index
+
+    def is_card_open(self):
+        return self.your_name == self.Player.name
+
+    def profile_maker(self):
+        profile_image = pygame.transform.scale(self.Player.profile, (100, 100))
+        profile_surface = pygame.Surface((100, 100))
+        profile_surface.fill(self.color)
+        profile_surface.blit(profile_image, (0, 0))
+        return profile_surface.convert_alpha()
+
+    def draw(self, screen):  # Pass screen as an argument
+        if self.is_card_open():
+            card1 = pygame.transform.rotate(self.Player.hand[0].image, self.index * 90)
+            card2 = pygame.transform.rotate(self.Player.hand[1].image, self.index * 90)
+        else:
+            card1 = pygame.transform.rotate(self.back_card, self.index * 90)
+            card2 = pygame.transform.rotate(self.back_card, self.index * 90)
+        card_width = card1.get_width()
+        card_height = card2.get_height()
+        screen.blit(self.profile_maker(), (self.x , self.y ))
+        if self.index== 0:
+           screen.blit(card1, (self.x+ 60, self.y-150))
+           screen.blit(card2, (self.x -60 , self.y-150))
+           screen.blit(self.Player.money_text, (self.x + 170, self.y-120 ))
+           screen.blit(self.Player.bet_text, (self.x + 170, self.y-95))
+        elif self.index== 1:
+            screen.blit(card1, (self.x -150, self.y+ 60))
+            screen.blit(card2, (self.x-150 , self.y-60))
+            screen.blit(self.Player.money_text, (self.x-220, self.y-135))
+            screen.blit(self.Player.bet_text, (self.x-220, self.y-105))
+        elif self.index== 2:
+            screen.blit(card1, (self.x+ 60, self.y+120))
+            screen.blit(card2, (self.x -60, self.y+120))
+            screen.blit(self.Player.money_text, (self.x - 250, self.y+ 150))
+            screen.blit(self.Player.bet_text, (self.x - 250, self.y+ 180))
+
+        elif self.index== 3:
+            screen.blit(card1, (self.x +170, self.y+ 60))
+            screen.blit(card2, (self.x +170 , self.y-60))
+            screen.blit(self.Player.money_text, (self.x+ 170, self.y-135))
+            screen.blit(self.Player.bet_text, (self.x+ 170, self.y-105))
+
 
 
 class Game:
@@ -46,44 +136,69 @@ class Game:
         self.connect_to_server()
         self.board = self.create_board()
         self.players = self.create_players()
-        # self.your_name = self.board_status_data["your_name"]
         self.current_player = self.board_status_data["Current Player"]
-        self.last_action = None
-        self.last_bet_amount = 0
 
-        self.screen_width, self.screen_height = 1920, 1000
+        self.bottom_player =  None
+        self.right_player = None
+        self.top_player = None
+        self.left_player = None
+
+        action_button_x = 50
+        action_button_y = 750
+        action_button_width = 200
+        action_button_height = 50
+        action_button_color = (139, 69, 19)
+        self.check_button = Button(action_button_x, action_button_y + 0 * (action_button_height + 10), action_button_width, action_button_height, "Check", action_button_color)
+        self.bet_button = Button(action_button_x, action_button_y + 1 * (action_button_height + 10), action_button_width, action_button_height, "Bet", action_button_color)
+        self.call_button = Button(action_button_x, action_button_y + 2 * (action_button_height + 10), action_button_width, action_button_height, "Call", action_button_color)
+        self.fold_button = Button(action_button_x, action_button_y + 3 * (action_button_height + 10), action_button_width, action_button_height, "Fold", action_button_color)
+        self.confirm_button = Button(action_button_x + 430, action_button_y + 1 * (action_button_height + 10), action_button_width, action_button_height, "Confirm", action_button_color)
+        self.cancel_button = Button(action_button_x + 430, action_button_y + 2 * (action_button_height + 10), action_button_width, action_button_height, "Cancel", action_button_color)
+        self.all_in_button = Button(action_button_x + 430, action_button_y + 3 * (action_button_height + 10), action_button_width, action_button_height, "All In", action_button_color)
+        self.action_buttons = [self.check_button, self.bet_button, self.call_button, self.fold_button, self.confirm_button, self.cancel_button, self.all_in_button]
+
+        self.screen_width = 1920
+        self.screen_height = 1000
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
         pygame.display.set_caption("Poker Game")
 
-        self.cloud_background = pygame.image.load(r'clouds.jpg')
-        self.cloud_background = pygame.transform.scale(self.cloud_background, (self.screen_width, self.screen_height))
-        self.bet_button_clicked = False
-        self.call_button_clicked = False
-        self.fold_button_clicked = False
-        self.check_button_clicked = False
-        self.bet_amount = 0  # Variable to store the bet amount
+        self.cloud_background = pygame.transform.scale(pygame.image.load(r'clouds.jpg'), (self.screen_width, self.screen_height))
+        self.last_bet_amount = 0
+        self.bet_amount = 0
         self.bet_text = ""
-        self.show_bet_options = True  # Flag to show/hide betting options
+        self.show_bet_options = False
 
         self.card_image_back = pygame.image.load(r'img_poker\back.png')
-        self.card_width, self.card_height = self.card_image_back.get_width(), self.card_image_back.get_height()
+        self.card_width = self.card_image_back.get_width()
+        self.card_height = self.card_image_back.get_height()
 
-        self.table_width = 1450
-        self.table_height = 650
-        self.table_x = (self.screen_width - self.table_width) // 2
-        self.table_y = (self.screen_height - self.table_height) // 2
-        self.frame_thickness = 10
-        self.frame_radius = 150
-        self.table_surface = pygame.Surface((self.table_width, self.table_height), pygame.SRCALPHA)
-        pygame.draw.rect(self.table_surface, (48, 104, 68), (0, 0, self.table_width, self.table_height),
-                         border_radius=self.frame_radius)
+        self.table = Table((self.screen_width - 1450) // 2, (self.screen_height - 650) // 2, 1450, 650, (48, 104, 68))
+
+    def connect_to_server(self):
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket.connect(("localhost", 8000))
+        self.board_status_data = json.loads(self.socket.recv(1024).decode())
+
+    def send_action_to_server(self, action):
+        json_data = {"action": action}
+        if action == 'bet':
+            json_data['bet'] = self.bet_amount
+        print(json_data)
+        self.socket.sendall(json.dumps(json_data).encode())
+
+    def update_game_state(self):
+        response = self.socket.recv(1024).decode()
+        if response:
+            self.board_status_data = json.loads(response)
+            self.board = self.create_board()
+            self.players = self.create_players()
 
     def create_board(self):
         round_number = self.board_status_data["Round"]
         current_bet = self.board_status_data["Current Bet"]
         minimum_bet = self.board_status_data["Minimum Bet"]
         current_player = self.board_status_data["Current Player"]
-        community_cards = self.board_status_data["CommunityCards"]
+        community_cards = self.board_status_data["Community Cards"]
         return Board(round_number, current_bet, minimum_bet, current_player, community_cards)
 
     def create_players(self):
@@ -92,7 +207,7 @@ class Game:
 
     def draw(self):
         self.screen.blit(self.cloud_background, (0, 0))
-        self.screen.blit(self.table_surface, (self.table_x, self.table_y))
+        self.table.draw(self.screen)
         for i in range(6):
             x = 500 + i * 10
             y = 430
@@ -102,228 +217,77 @@ class Game:
             y = 430
             self.screen.blit(card.image, (x, y))
 
-
         players_queue = deque()
         for player in self.players:
             players_queue.append(player)
 
         while players_queue[0].name != self.current_player:
-            players_before_you = players_queue.popleft()
-            players_queue.append(players_before_you)
+            players_queue.append(players_queue.popleft())
 
-        arr = list(players_queue)
-        i = 0
-        while players_queue:
-            player = players_queue.popleft()
+        self.bottom_player = PlayerProfile(players_queue[0], 920, 850, self.card_image_back, (0, 0, 128), self.current_player, 0)
 
-            if i == 0:  # Bottum
-                x = self.table_x + self.table_width // 2 - self.card_width
-                y = self.table_y + self.table_height - self.card_height + 20
-                self.screen.blit(player.hand[0].image, (x, y))
-                self.screen.blit(player.hand[1].image, (x + self.card_width + 15, y))
+        self.right_player = PlayerProfile(players_queue[1], 1730 , 450,self.card_image_back ,(135, 206, 235), self.current_player, 1)
 
-                profile1_image = pygame.transform.scale(player.profile, (100, 100))
-                profile1_surface = pygame.Surface((100, 100))
-                profile1_surface.fill((0, 0, 128))
-                profile1_surface.blit(profile1_image, (0, 0))
-                profile1 = profile1_surface.convert_alpha()
-                self.screen.blit(profile1, (x + self.card_width / 2 + 15, y + 150))
+        self.top_player = PlayerProfile(players_queue[2], 920, 50, self.card_image_back, (111, 78, 55), self.current_player, 2)
 
-                self.screen.blit(player.money_text, (x + self.card_width // 2 + 200, y + 90))
-                self.screen.blit(player.bet_text, (x + self.card_width // 2 + 200, y + 40))
-            elif i == 1:  # Right
-                x = self.table_x + self.table_width - self.card_width - 20
-                y = self.table_y + self.table_height // 2 - self.card_height // 2
-                card1 = pygame.transform.rotate(self.card_image_back, 90)
-                card2 = pygame.transform.rotate(self.card_image_back, 90)
-                self.screen.blit(card1, (x, y - self.card_width // 2))
-                self.screen.blit(card2, (x, y + self.card_width // 2 + 20))
+        self.left_player = PlayerProfile(players_queue[3], 85, 450, self.card_image_back, (253, 255, 182), self.current_player, 3)
 
-                profile2_image = pygame.transform.scale(player.profile, (100, 100))
-                profile2_surface = pygame.Surface((100, 100))
-                profile2_surface.fill((135, 206, 235))  # sky blue background
-                profile2_surface.blit(profile2_image, (0, 0))
-                profile2 = profile2_surface.convert_alpha()
-                self.screen.blit(profile2, (x + 150, y))
+        self.bottom_player.draw(self.screen)
+        self.right_player.draw(self.screen)
+        self.top_player.draw(self.screen)
+        self.left_player.draw(self.screen)
 
-                self.screen.blit(player.money_text, (x + self.card_width // 2 - 50, y + 250))
-                self.screen.blit(player.bet_text, (x + self.card_width // 2 - 50, y + 200))
-            elif i == 2:  # Top
-                x = self.table_x + self.table_width // 2 - self.card_width
-                y = self.table_y - self.card_height + self.card_height - 20
-                self.screen.blit(self.card_image_back, (x, y))
-                self.screen.blit(self.card_image_back, (x + self.card_width + 15, y))
 
-                profile3_image = pygame.transform.scale(player.profile, (100, 100))
-                profile3_surface = pygame.Surface((100, 100))
-                profile3_surface.fill((111, 78, 55))
-                profile3_surface.blit(profile3_image, (0, 0))
-                profile3 = profile3_surface.convert_alpha()
-                self.screen.blit(profile3, (x + self.card_width // 2 + 7.5, y - 120))
+        self.check_button.draw(self.screen)
+        self.bet_button.draw(self.screen)
+        self.call_button.draw(self.screen)
+        self.fold_button.draw(self.screen)
 
-                self.screen.blit(player.money_text, (x + self.card_width // 2 - 220, y + 100))
-                self.screen.blit(player.bet_text, (x + self.card_width // 2 - 220, y + 50))
-            else:  # Left
-                x = self.table_x - 20
-                y = self.table_y + self.table_height // 2 - self.card_height // 2
-                card1 = pygame.transform.rotate(self.card_image_back, -90)
-                card2 = pygame.transform.rotate(self.card_image_back, -90)
-                self.screen.blit(card1, (x, y - self.card_width // 2))
-                self.screen.blit(card2, (x, y + self.card_width // 2 + 20))
-
-                profile4_image = pygame.transform.scale(player.profile, (100, 100))
-                profile4_surface = pygame.Surface((100, 100))
-                profile4_surface.fill((253, 255, 182))
-                profile4_surface.blit(profile4_image, (0, 0))
-                profile4 = profile4_surface.convert_alpha()
-                self.screen.blit(profile4, (x - 130, y + 10))
-
-                self.screen.blit(player.money_text, (x + self.card_width // 2, y + 250))
-                self.screen.blit(player.bet_text, (x + self.card_width // 2, y + 200))
-
-            i = i + 1
-
-        # if self.your_name == self.current_player:
-        if True:
-            action_button_width = 200
-            action_button_height = 50
+        if self.show_bet_options:
             action_button_x = 50
-            action_button_y = 730
-            action_buttons = ["Call", "Bet", "Fold", "Check"]
-            for i, button in enumerate(action_buttons):
-                pygame.draw.rect(self.screen, (139, 69, 19),
-                                 (action_button_x, action_button_y + i * (action_button_height + 10),
-                                  action_button_width, action_button_height), border_radius=10)
-                font = pygame.font.Font(None, 36)
-                text = font.render(button, True, (255, 255, 255))
-                text_rect = text.get_rect(
-                    center=(action_button_x + action_button_width // 2,
-                            action_button_y + i * (action_button_height + 10) + action_button_height // 2))
-                self.screen.blit(text, text_rect)
-                bet_button_rect = pygame.Rect(action_button_x, action_button_y + 50, action_button_width,
-                                              action_button_height)
+            action_button_y = 750
+            # Draw betting input field
+            bet_input_rect = pygame.Rect(action_button_x + 220, action_button_y + 60, 200, 50)
+            pygame.draw.rect(self.screen, (255, 255, 255), bet_input_rect)
+            pygame.draw.rect(self.screen, (0, 0, 0), bet_input_rect, 2)
 
+            # Draw typed bet text
+            font = pygame.font.Font(None, 36)
+            bet_text_surface = font.render(self.bet_text, True, (0, 0, 0))
+            self.screen.blit(bet_text_surface, (action_button_x + 225, action_button_y + 73))
 
-            bet_button_rect = pygame.Rect(action_button_x, action_button_y + 50, action_button_width, action_button_height)
-            call_button_rect = pygame.Rect(action_button_x, action_button_y, action_button_width, action_button_height)
-            fold_button_rect = pygame.Rect(action_button_x, action_button_y+100, action_button_width, action_button_height)
-            check_button_rect = pygame.Rect(action_button_x, action_button_y+150, action_button_width, action_button_height)
-            if bet_button_rect.collidepoint(pygame.mouse.get_pos()):
-                if pygame.mouse.get_pressed()[0]:  # Left mouse button clicked
-                    self.bet_button_clicked = True
-            elif call_button_rect.collidepoint(pygame.mouse.get_pos()):
-                if pygame.mouse.get_pressed()[0]:  # Left mouse button
-                    self.call_button_clicked = True
-            elif fold_button_rect.collidepoint(pygame.mouse.get_pos()):
-                if pygame.mouse.get_pressed()[0]:  # Left mouse button
-                    self.fold_button_clicked = True
-            elif check_button_rect.collidepoint(pygame.mouse.get_pos()):
-                 if pygame.mouse.get_pressed()[0]:  # Left mouse button
-                    self.check_button_clicked = True
+            # Draw "Confirm", "Cancel", and "All In" buttons
+            self.confirm_button.draw(self.screen)
+            self.cancel_button.draw(self.screen)
+            self.all_in_button.draw(self.screen)
 
-
-
-
-
-            if self.bet_button_clicked:
-                # Draw betting input field
-                bet_input_rect = pygame.Rect(action_button_x + 220, action_button_y + 50, 200, 50)
-                pygame.draw.rect(self.screen, (255, 255, 255), bet_input_rect)
-                pygame.draw.rect(self.screen, (0, 0, 0), bet_input_rect, 2)
-
-                # Draw typed bet text
-                font = pygame.font.Font(None, 36)
-                bet_text_surface = font.render(self.bet_text, True, (0, 0, 0))
-                self.screen.blit(bet_text_surface, (action_button_x + 225, action_button_y + 55))
-
-                # Handle events for typing bet amount
-                for event in pygame.event.get():
-                    if event.type == pygame.KEYDOWN:
-                        if event.key == pygame.K_BACKSPACE:
-                            # Handle backspace - remove last character from bet_text
-                            self.bet_text = self.bet_text[:-1]
-                        # Handle typing of bet amount (numbers)
-                        elif event.key in [pygame.K_0, pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4,
-                                           pygame.K_5, pygame.K_6, pygame.K_7, pygame.K_8, pygame.K_9]:
-                            typed_number = int(self.bet_text + event.unicode)
-                            if typed_number < self.players[0].money:
-                                self.bet_text += event.unicode
-
-
-                # Draw "Confirm", "Cancel", and "All In" buttons
-                if self.show_bet_options:  # Only draw if flag is True
-                    confirm_button_rect = pygame.Rect(action_button_x + 430, action_button_y + 50, 180, 40)
-                    pygame.draw.rect(self.screen, (139, 69, 19), confirm_button_rect)
-                    confirm_text = font.render("Confirm", True, (255, 255, 255))
-                    self.screen.blit(confirm_text, (action_button_x + 480, action_button_y + 55))
-
-                    cancel_button_rect = pygame.Rect(action_button_x + 430, action_button_y + 110, 180, 40)
-                    pygame.draw.rect(self.screen, (139, 69, 19), cancel_button_rect)
-                    cancel_text = font.render("Cancel", True, (255, 255, 255))
-                    self.screen.blit(cancel_text, (action_button_x + 480, action_button_y + 115))
-
-                    all_in_button_rect = pygame.Rect(action_button_x + 430, action_button_y + 170, 180, 40)
-                    pygame.draw.rect(self.screen, (139, 69, 19), all_in_button_rect)
-                    all_in_text = font.render("All In", True, (255, 255, 255))
-                    self.screen.blit(all_in_text, (action_button_x + 480, action_button_y + 175))
-
-                    # Handle click event on "Cancel" button
-                    if cancel_button_rect.collidepoint(pygame.mouse.get_pos()):
-                        if pygame.mouse.get_pressed()[0]:  # Left mouse button clicked
-                            self.bet_button_clicked = False
-                            self.bet_text = ""  # Reset the bet text
-
-                    if confirm_button_rect.collidepoint(pygame.mouse.get_pos()):
-                        if pygame.mouse.get_pressed()[0]:
-                            bet_amount = int(self.bet_text)
-                            self.bet_button_clicked = False
-                            self.last_action = "Bet"  # Remember the last action
-                            self.last_bet_amount = bet_amount  # Remember the last bet amount
-
-
-
-                    if all_in_button_rect.collidepoint(pygame.mouse.get_pos()):
-                        if pygame.mouse.get_pressed()[0]:
-                            self.bet_button_clicked = False
-                            self.last_action = "All-In"
-
-            elif self.call_button_clicked== True:
-                 self.call_button_clicked = False
-                 self.last_action= "Call"
-
-            elif self.fold_button_clicked:
-                 self.fold_button_clicked = False
-                 self.fold_action= "Fold"
-
-            elif self.fold_button_clicked:
-                 self.fold_button_clicked = False
-                 self.fold_action= "Check"
+            if self.all_in_button.rect.collidepoint(pygame.mouse.get_pos()): # Change the logic of All-In later
+                if pygame.mouse.get_pressed()[0]:
+                    self.bet_button_clicked = False
 
         pygame.display.flip()
-    def connect_to_server(self):
-        # Create a socket object
-        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-        # Connect to the server
-        server_address = ("localhost", 8000)  # Replace with your server's address and port
-        client_socket.connect(server_address)
-
-        response = client_socket.recv(1024).decode() # getting the board here
-        self.board_status_data = ast.literal_eval(response)
-        print(self.board_status_data)
-
-        client_socket.close()
-
-    def send_json_to_server(self, json_data):
-        try:
-            client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            server_address = ("localhost", 8000)  # Change to your server address
-            client_socket.connect(server_address)
-            message = json.dumps(json_data)
-            client_socket.sendall(message.encode())
-            client_socket.close()
-        except Exception as e:
-            print(f"Error sending JSON data to server: {e}")
+    def handle_events(self, event):
+        for button in self.action_buttons:
+            button.handle_event(event)
+            if button.is_clicked():
+                if button.text == 'Bet':
+                    self.show_bet_options = True
+                elif button.text == 'Cancel':
+                    self.bet_text = ""
+                elif button.text == 'Confirm':
+                    self.send_action_to_server('bet')
+                else:
+                    self.send_action_to_server(button.text.lower())
+                print(button.text)
+        if event.type == pygame.KEYDOWN:
+            if self.show_bet_options:
+                if event.key == pygame.K_BACKSPACE:
+                    self.bet_text = self.bet_text[:-1]
+                elif event.key in [pygame.K_0, pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4, pygame.K_5, pygame.K_6, pygame.K_7, pygame.K_8, pygame.K_9]:
+                    typed_number = int(self.bet_text + event.unicode)
+                    if typed_number <= self.players[0].money:
+                        self.bet_text += event.unicode
 
     def run(self):
         clock = pygame.time.Clock()
@@ -332,36 +296,14 @@ class Game:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
-                self.draw()
-            if self.last_action:
-                if self.last_action == "Bet":
-                    json_data = {"Action": "Bet", "bet": self.last_bet_amount}
-                elif self.last_action == "All-In":
-                    json_data = {"Action": "All-In"}
-                elif self.last_action == "Call":
-                    json_data = {"Action": "Call"}
-                elif self.last_action == "Fold":
-                    json_data = {"Action": "Fold"}
-                elif self.last_action == "Check":
-                    json_data = {"Action": "Check"}
+                self.handle_events(event)
 
-                self.send_json_to_server(json_data)
-
-            # End of game loop
+            self.draw()
             clock.tick(60)
+
         pygame.quit()
         sys.exit()
-
 
 if __name__ == "__main__":
     game = Game()
     game.run()
-
-
-
-
-
-
-
-
-

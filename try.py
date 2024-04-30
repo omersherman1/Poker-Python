@@ -315,3 +315,75 @@ json = {
 json = {
     "Action": "Check"
 }
+
+
+i = 0
+while players_queue:
+    player = players_queue.popleft()
+
+    if i == 0:  # Bottom
+        x = self.table.rect.x + self.table.rect.width // 2 - self.card_width
+        y = self.table.rect.y + self.table.rect.height - self.card_height + 20
+        self.screen.blit(player.hand[0].image, (x, y))
+        self.screen.blit(player.hand[1].image, (x + self.card_width + 15, y))
+
+        profile1_image = pygame.transform.scale(player.profile, (100, 100))
+        profile1_surface = pygame.Surface((100, 100))
+        profile1_surface.fill((0, 0, 128))
+        profile1_surface.blit(profile1_image, (0, 0))
+        profile1 = profile1_surface.convert_alpha()
+        self.screen.blit(profile1, (x + self.card_width / 2 + 15, y + 150))
+
+        self.screen.blit(player.money_text, (x + self.card_width // 2 + 200, y + 90))
+        self.screen.blit(player.bet_text, (x + self.card_width // 2 + 200, y + 40))
+    elif i == 1:  # Right
+        x = self.table.rect.x + self.table.rect.width - self.card_width - 20
+        y = self.table.rect.y + self.table.rect.height // 2 - self.card_height // 2
+        card1 = pygame.transform.rotate(self.card_image_back, 90)
+        card2 = pygame.transform.rotate(self.card_image_back, 90)
+        self.screen.blit(card1, (x, y - self.card_width // 2))
+        self.screen.blit(card2, (x, y + self.card_width // 2 + 20))
+
+        profile2_image = pygame.transform.scale(player.profile, (100, 100))
+        profile2_surface = pygame.Surface((100, 100))
+        profile2_surface.fill((135, 206, 235))  # sky blue background
+        profile2_surface.blit(profile2_image, (0, 0))
+        profile2 = profile2_surface.convert_alpha()
+        self.screen.blit(profile2, (x + 150, y))
+
+        self.screen.blit(player.money_text, (x + self.card_width // 2 - 50, y + 250))
+        self.screen.blit(player.bet_text, (x + self.card_width // 2 - 50, y + 200))
+    elif i == 2:  # Top
+        x = self.table.rect.x + self.table.rect.width // 2 - self.card_width
+        y = self.table.rect.y - self.card_height + self.card_height - 20
+        self.screen.blit(self.card_image_back, (x, y))
+        self.screen.blit(self.card_image_back, (x + self.card_width + 15, y))
+
+        profile3_image = pygame.transform.scale(player.profile, (100, 100))
+        profile3_surface = pygame.Surface((100, 100))
+        profile3_surface.fill((111, 78, 55))
+        profile3_surface.blit(profile3_image, (0, 0))
+        profile3 = profile3_surface.convert_alpha()
+        self.screen.blit(profile3, (x + self.card_width // 2 + 7.5, y - 120))
+
+        self.screen.blit(player.money_text, (x + self.card_width // 2 - 220, y + 100))
+        self.screen.blit(player.bet_text, (x + self.card_width // 2 - 220, y + 50))
+    else:  # Left
+        x = self.table.rect.x - 20
+        y = self.table.rect.y + self.table.rect.height // 2 - self.card_height // 2
+        card1 = pygame.transform.rotate(self.card_image_back, -90)
+        card2 = pygame.transform.rotate(self.card_image_back, -90)
+        self.screen.blit(card1, (x, y - self.card_width // 2))
+        self.screen.blit(card2, (x, y + self.card_width // 2 + 20))
+
+        profile4_image = pygame.transform.scale(player.profile, (100, 100))
+        profile4_surface = pygame.Surface((100, 100))
+        profile4_surface.fill((253, 255, 182))
+        profile4_surface.blit(profile4_image, (0, 0))
+        profile4 = profile4_surface.convert_alpha()
+        self.screen.blit(profile4, (x - 130, y + 10))
+
+        self.screen.blit(player.money_text, (x + self.card_width // 2, y + 250))
+        self.screen.blit(player.bet_text, (x + self.card_width // 2, y + 200))
+
+    i = i + 1
