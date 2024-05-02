@@ -103,32 +103,32 @@ class PlayerProfile:
         if self.index == 0:
             card1 = pygame.transform.rotate(self.Player.hand[0].image, self.index * 90)
             card2 = pygame.transform.rotate(self.Player.hand[1].image, self.index * 90)
-            screen.blit(card1, (self.x + 60, self.y - 150))
-            screen.blit(card2, (self.x - 60, self.y - 150))
+            screen.blit(card1, (self.x + 55, self.y - 169))
+            screen.blit(card2, (self.x - 55, self.y - 169))
             screen.blit(self.Player.name_text, (self.x + 170, self.y - 150))
             screen.blit(self.Player.money_text, (self.x + 170, self.y - 120))
             screen.blit(self.Player.bet_text, (self.x + 170, self.y - 90))
             if self.Player.name == self.current_player:
                 pygame.draw.circle(screen, (255,255,255), (self.x+150, self.y+50), 25)
         elif self.index == 1:
-            screen.blit(card1, (self.x - 150, self.y + 60))
-            screen.blit(card2, (self.x - 150, self.y - 60))
+            screen.blit(card1, (self.x - 170, self.y + 55))
+            screen.blit(card2, (self.x - 170, self.y - 55))
             screen.blit(self.Player.name_text, (self.x - 220, self.y - 165))
             screen.blit(self.Player.money_text, (self.x - 220, self.y - 135))
             screen.blit(self.Player.bet_text, (self.x - 220, self.y - 105))
             if self.Player.name == self.current_player:
                pygame.draw.circle(screen, (139, 0, 0), (self.x + 50, self.y - 50), 25)
         elif self.index == 2:
-            screen.blit(card1, (self.x + 60, self.y + 120))
-            screen.blit(card2, (self.x - 60, self.y + 120))
+            screen.blit(card1, (self.x + 55, self.y + 125))
+            screen.blit(card2, (self.x - 55, self.y + 125))
             screen.blit(self.Player.name_text, (self.x -250, self.y + 150))
             screen.blit(self.Player.money_text, (self.x - 250, self.y + 180))
             screen.blit(self.Player.bet_text, (self.x - 250, self.y + 210))
             if self.Player.name == self.current_player:
                pygame.draw.circle(screen, (255,255,255), (self.x - 50, self.y + 50 ), 25)
         elif self.index == 3:
-            screen.blit(card1, (self.x + 170, self.y + 60))
-            screen.blit(card2, (self.x + 170, self.y - 60))
+            screen.blit(card1, (self.x + 128, self.y + 55))
+            screen.blit(card2, (self.x + 128, self.y - 55))
             screen.blit(self.Player.name_text, (self.x + 170, self.y - 165))
             screen.blit(self.Player.money_text, (self.x + 170, self.y - 135))
             screen.blit(self.Player.bet_text, (self.x + 170, self.y - 105))
@@ -250,11 +250,11 @@ class Game:
 
             self.bottom_player = PlayerProfile(players_queue[0], 920, 850, self.card_image_back, (0, 0, 128),
                                                self.current_player, 0)
-            self.right_player = PlayerProfile(players_queue[1], 1730, 450, self.card_image_back, (135, 206, 235),
+            self.right_player = PlayerProfile(players_queue[1], 1711, 452, self.card_image_back, (135, 206, 235),
                                               self.current_player, 1)
             self.top_player = PlayerProfile(players_queue[2], 920, 50, self.card_image_back, (111, 78, 55),
                                             self.current_player, 2)
-            self.left_player = PlayerProfile(players_queue[3], 85, 450, self.card_image_back, (253, 255, 182),
+            self.left_player = PlayerProfile(players_queue[3], 108, 452, self.card_image_back, (253, 255, 182),
                                              self.current_player, 3)
 
             self.bottom_player.draw(self.screen)
