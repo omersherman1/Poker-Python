@@ -5,6 +5,7 @@ from collections import deque
 
 from player import *
 
+
 class Board:
     def __init__(self, players):
         self.deck = Deck()
@@ -19,10 +20,6 @@ class Board:
         self.players = []
         for name in players:
             self.players.append(Player(name))
-
-    def is_round_over(self, last_bettor):
-        # Check if it's the last bettor's turn again
-        return all(player.bet == 0 or player == last_bettor for player in self.players)
 
     def play_round(self, client_socket):
         self.players_in_round = deque([player for player in self.players if player.money > 0])
@@ -113,12 +110,12 @@ class Board:
 
             if self.current_player.money > 0:
                 self.minimum_bet = max(self.current_bet, self.minimum_bet)
-                data_for_client = self.send_board_to_client()
-                client_socket.sendall(json.dumps(data_for_client).encode())
 
-                # Receive the JSON data from the client
+                self.send_board_to_client(client_socket)
+                print("Waiting for " + self.current_player.name + " input")
                 message = client_socket.recv(1024).decode()
                 json_from_client = json.loads(message)
+                print(json_from_client['action'])
 
                 bet_made = self.make_bet(json_from_client)
 
@@ -135,7 +132,6 @@ class Board:
 
             self.players_in_round.popleft()
 
-
     def deal_flop(self):
         for card in range(3):
             self.community_cards.append(self.deck.draw_card())
@@ -147,8 +143,6 @@ class Board:
         self.community_cards.append(self.deck.draw_card())
 
     def display_board(self):
-        self.send_board_to_client()
-
         print("Community Cards:")
         for card in self.community_cards:
             print(str(card))
@@ -170,7 +164,7 @@ class Board:
         for player in self.players:
             player.draw_hand(self.deck)
 
-    def send_board_to_client(self):
+    def send_board_to_client(self, client_socket):
         data_for_client = {
             'Community Cards': [],
             'Players': []
@@ -187,7 +181,7 @@ class Board:
         for player in self.players:
             data_for_client['Players'].append(player.__dict__())
 
-        return data_for_client
+        client_socket.sendall(json.dumps(data_for_client).encode())
 
 
 class PokerGameServer:
@@ -203,17 +197,23 @@ class PokerGameServer:
     def handle_client(self, client_socket, client_address):
         print(f"Connected by {client_address}")
 
-        while True:
-            self.board.play_round(client_socket)
+        try:
+            while True:
+                self.board.play_round(client_socket)
 
-            # Check if any player is out of money
-            if any(player.money <= 0 for player in self.board.players):
-                print("Game over!")
-                break
-            self.board.round_number += 1  # Increment round number
+                # Check if any player is out of money
+                if any(player.money <= 0 for player in self.board.players):
+                    print("Game over!")
+                    break
+                self.board.round_number += 1  # Increment round number
 
-        print(f"Disconnected by {client_address}")
-        del self.clients[client_address]
+        except ConnectionResetError:
+            print(f"Disconnected by {client_address}")
+        except Exception as e:
+            print(f"Error handling client {client_address}: {str(e)}")
+        finally:
+            del self.clients[client_address]
+            client_socket.close()
 
     def start(self):
         print("Poker game server started")
@@ -225,3 +225,4 @@ class PokerGameServer:
 if __name__ == "__main__":
     server = PokerGameServer("localhost", 8000)
     server.start()
+
