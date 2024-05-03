@@ -18,9 +18,25 @@ class Card:
         self.path = f"img_poker\\{self.suit}{self.rank}.png"
         self.image = pygame.image.load(self.path)
 
+class Status:
+    def __init__(self, status, pot):
+
+        self.status= status
+        self.pot= pot
+        self.font = pygame.font.Font(None, 36)
+        self.status_text = self.font.render(f"Status: {self.status}", True, (0, 0, 0))
+        self.pot_text = self.font.render(f"pot: {self.pot}", True, (0, 0, 0))
+    def draw(self, screen):
+        screen.blit(self.status_text, (170,100))
+        screen.blit(self.pot_text, (170,110))
+
+
+
+
+
 
 class Player:
-    def __init__(self, name, money, bet, hand):
+    def __init__(self, name, money, bet, hand, current_best_combination):
         self.name = name
         self.money = money
         self.bet = bet
@@ -31,6 +47,9 @@ class Player:
         self.name_text = self.font.render(f"{self.name}", True, (255,255,255))
         self.money_text = self.font.render(f"Money: {self.money}", True, (0, 0, 0))
         self.bet_text = self.font.render(f"Bet: {self.bet}", True, (0, 0, 0))
+        self.combination = current_best_combination
+        self.combination_text = self.font.render(f"Best Combination: {self.combination}", True, (0, 0, 0))
+
 
 
 class Board:
@@ -108,6 +127,7 @@ class PlayerProfile:
             screen.blit(self.Player.name_text, (self.x + 170, self.y - 150))
             screen.blit(self.Player.money_text, (self.x + 170, self.y - 120))
             screen.blit(self.Player.bet_text, (self.x + 170, self.y - 90))
+            screen.blit(self.Player.combination_text, (self.x,self.y))
             if self.Player.name == self.current_player:
                 pygame.draw.circle(screen, (255,255,255), (self.x+150, self.y+50), 25)
         elif self.index == 1:
@@ -117,7 +137,7 @@ class PlayerProfile:
             screen.blit(self.Player.money_text, (self.x - 220, self.y - 135))
             screen.blit(self.Player.bet_text, (self.x - 220, self.y - 105))
             if self.Player.name == self.current_player:
-               pygame.draw.circle(screen, (139, 0, 0), (self.x + 50, self.y - 50), 25)
+                pygame.draw.circle(screen, (139, 0, 0), (self.x + 50, self.y - 50), 25)
         elif self.index == 2:
             screen.blit(card1, (self.x + 55, self.y + 125))
             screen.blit(card2, (self.x - 55, self.y + 125))
@@ -125,7 +145,7 @@ class PlayerProfile:
             screen.blit(self.Player.money_text, (self.x - 250, self.y + 180))
             screen.blit(self.Player.bet_text, (self.x - 250, self.y + 210))
             if self.Player.name == self.current_player:
-               pygame.draw.circle(screen, (255,255,255), (self.x - 50, self.y + 50 ), 25)
+                pygame.draw.circle(screen, (255,255,255), (self.x - 50, self.y + 50 ), 25)
         elif self.index == 3:
             screen.blit(card1, (self.x + 128, self.y + 55))
             screen.blit(card2, (self.x + 128, self.y - 55))
@@ -133,7 +153,7 @@ class PlayerProfile:
             screen.blit(self.Player.money_text, (self.x + 170, self.y - 135))
             screen.blit(self.Player.bet_text, (self.x + 170, self.y - 105))
             if self.Player.name == self.current_player:
-               pygame.draw.circle(screen, (255,255,255), (self.x + 50, self.y+ 150), 25)
+                pygame.draw.circle(screen, (255,255,255), (self.x + 50, self.y+ 150), 25)
 
 
 class Game:
@@ -173,6 +193,8 @@ class Game:
         self.action_buttons = [self.check_button, self.bet_button, self.call_button, self.fold_button,
                                self.confirm_button, self.cancel_button, self.all_in_button]
 
+
+
         self.screen_width = 1920
         self.screen_height = 1000
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
@@ -207,7 +229,9 @@ class Game:
             self.board_status_data = json.loads(response)
             self.board = self.create_board()
             self.players = self.create_players()
+            self.diler = self.create_status()
             self.current_player = self.board_status_data["Current Player"]
+
 
     def create_board(self):
         round_number = self.board_status_data["Round"]
@@ -215,11 +239,18 @@ class Game:
         minimum_bet = self.board_status_data["Minimum Bet"]
         current_player = self.board_status_data["Current Player"]
         community_cards = self.board_status_data["Community Cards"]
+
         return Board(round_number, current_bet, minimum_bet, current_player, community_cards)
+
+    def create_status(self):
+        status= self.board_status_data["Status"]
+        pot= self.board_status_data["pot"]
+        return Status(status, pot)
+
 
     def create_players(self):
         players_data = self.board_status_data["Players"]
-        return [Player(player["name"], player["money"], player["bet"], player["hand"]) for player in players_data]
+        return [(Player(player["name"], player["money"], player["bet"], player["hand"]), player["combination"]) for player in players_data]
 
     def draw(self):
         try:
@@ -261,6 +292,9 @@ class Game:
             self.right_player.draw(self.screen)
             self.top_player.draw(self.screen)
             self.left_player.draw(self.screen)
+
+            self.status.draw(self.screen)
+            self.pot.draw(self.screen)
 
             self.check_button.draw(self.screen)
             self.bet_button.draw(self.screen)
@@ -342,3 +376,4 @@ class Game:
 if __name__ == "__main__":
     game = Game()
     game.run()
+

@@ -7,10 +7,9 @@ class Player:
         self.hand = []
         self.money = 10000
         self.bet = 0
-        self.current_best_combination = []
+        self.current_best_combination = None
+        self.current_score= 0
 
-    def __dict__(self):
-        return {"name": self.name, "money": self.money, "bet": self.bet, "hand": [card.__dict__() for card in self.hand]}
 
     def draw_hand(self, deck):
         self.hand = [deck.draw_card() for _ in range(2)]
@@ -26,6 +25,8 @@ class Player:
         four = 0
         flash = 0
         stright = 0
+        high_card1 = 0
+        high_card2= 0
 
         for i in range(13):
             arr_number[i] = 0
@@ -42,7 +43,6 @@ class Player:
                 else:
                     if int(card.rank) == i + 2:
                         arr_number[i]+=1
-
         for i in range(13):
             number = i + 2
             if arr_number[i] == 2:
@@ -69,6 +69,11 @@ class Player:
             elif arr_number[i] == 4:
                 if three == 0:
                     four = number
+            elif arr_number[i] == 1 and high_card1 != 0:
+                high_card2= high_card1
+                high_card1 = arr_number[i]
+
+
 
         suits = ['Hearts', 'Diamonds', 'Clubs', 'Spades']
         suits_counter = [0, 0, 0, 0]
@@ -108,23 +113,48 @@ class Player:
                 index = 0
             if index >= 5:
                 stright == rank_arr[i + 1]
+        return pair1, pair2, three, four, flush, straight, high_card1, high_card2
+    def his_hand(pair1, pair2, three, four, flush, straight, high_card1, high_card2):
+        if straight != 0 and flush != 0:
+            your_combination= "straight flush"
+            score= 8000 + straight
+        elif four!=0:
+            your_combination= "four"
+            score= 700 + four
+        elif pair1 != 0 and three != 0:
+            your_combination= "full house"
+            score= 600 + max(pair1, pair2) + three
+        elif flush != 0:
+            your_combination= "flush"
+            score= 500
+        elif straight != 0:
+            your_combination= "straight"
+            score= 400+ straight
+        elif three!=0:
+            your_combination= "three"
+            score= 300 + three
+        elif pair1!= 0 and parir2 != 0:
+            your_combination= "2 pairs"
+            score= 200 + pair1 + pair2
+        elif pair1 != 0:
+            your_combination= "pairs"
+            score= 100 + pair1
+        else:
+            your_combination= "high cards"
+            score= high_card1 + high_card2* 0.01
+        self.current_best_combination = your_combination  # Initialize to None
+        self.current_score = score
 
-    def is_straight(self, hand):
-        values = []
-        for card in hand:
-            values.append(card.rank)
-        values.sort()
-        for i in range(0, 4):
-            if values[i] + 1 != values[i + 1]:
-                return False
-        return True
+        return your_combination, score
 
-    def is_flush(self, hand):
-        suit = hand[0].suit
-        for card in hand:
-            if card.suit != suit:
-                return False
-        return True
+    def __dict__(self):
+        return {
+            "name": self.name,
+            "money": self.money,
+            "bet": self.bet,
+            "hand": [card.__dict__() for card in self.hand],
+            "combination": self.current_best_combination}
+
 
 
 class Card:
