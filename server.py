@@ -22,13 +22,14 @@ class Board:
         for name in players:
             self.players.append(Player(name))
 
-    def play_round(self, client_socket):
+    def play_round(self, clients):
         self.players_in_round = deque([player for player in self.players if player.money > 0])
 
         print(f"\n--- Round {self.round_number} ---")
 
         if self.round_number == 1:
             self.deal_initial_hands()
+        self.evaluate_all_hands()
 
         while not len(self.players_in_round) == 0:
             if self.round_number == 2:
@@ -43,100 +44,119 @@ class Board:
                 self.deal_river()
 
             self.display_board()
-            self.collect_bets(client_socket)
+            self.collect_bets(clients)
 
         if self.round_number == 4:
             winning_player = self.determine_winner()
             winning_player.money += self.pot
             self.pot = 0
+            self.reset_board()  # Reset the board after determining the winner
 
+    def evaluate_all_hands(self):
+        for player in self.players:
+            player.combination(player.hand[0], player.hand[1], self.community_cards)
 
-    def make_bet(self, jsonFromClient, client_socket):
+    def reset_board(self):
+        self.deck = Deck()
+        self.community_cards = []
+        self.minimum_bet = 50
+        self.round_number = 0
+        self.status = None
+        for player in self.players:
+            player.hand = []
+            player.current_best_combination = "None"
+            player.current_score = 0
+
+        self.deal_initial_hands()  # Deal new hands to all players
+
+    def deal_initial_hands(self):
+        for player in self.players:
+            player.draw_hand(self.deck)
+
+    def make_bet(self, jsonFromClient, clients):
         choice = jsonFromClient["action"]
         bet_amount = jsonFromClient.get("bet", 0)
 
         if choice == "fold":
             # Fold
             self.current_player.bet = 0
-            self.current_player.flag = False
             return 0
+
         elif choice == "check":
             # Check
             if self.current_bet == 0:
                 self.current_player.bet = 0  # Check
-                self.current_player.flag = False
                 return 0
+
             else:
                 self.status = "You can't check if a player has bet money. Please choose another option."
 
-                self.send_board_to_client(client_socket)
+                self.send_board_to_all_clients(clients)
                 print("Waiting for " + self.current_player.name + " input")
-                json_from_client = json.loads(client_socket.recv(1024).decode())
+                json_from_client = json.loads(clients.get(self.current_player.name).recv(1024).decode())
 
-                return self.make_bet(json_from_client, client_socket)  # ask again
+                return self.make_bet(json_from_client, clients)  # ask again
+
         elif choice == "bet":
-            # Bet
             if bet_amount >= self.minimum_bet and bet_amount <= self.current_player.money:
                 self.current_player.bet = bet_amount
                 self.current_player.money -= bet_amount
-                self.current_player.flag = True
                 self.pot = self.pot + bet_amount
-
                 return bet_amount
+
             else:
                 self.status = "Invalid bet amount."
                 print("Invalid bet amount.")
 
-                self.send_board_to_client(client_socket)
+                self.send_board_to_all_clients(clients)
                 print("Waiting for " + self.current_player.name + " input")
-                json_from_client = json.loads(client_socket.recv(1024).decode())
+                json_from_client = json.loads(clients.get(self.current_player.name).recv(1024).decode())
+                return self.make_bet(json_from_client, clients)  # ask again
 
-                return self.make_bet(json_from_client, client_socket)  # ask again
         elif choice == "call":
             # Call
             if self.current_bet == 0:
                 self.status = "There is no bet to call. Please choose another option."
                 print("There is no bet to call. Please choose another option.")
 
-                self.send_board_to_client(client_socket)
+                self.send_board_to_all_clients(clients)
                 print("Waiting for " + self.current_player.name + " input")
-                json_from_client = json.loads(client_socket.recv(1024).decode())
+                json_from_client = json.loads(clients.get(self.current_player.name).recv(1024).decode())
+                return self.make_bet(json_from_client, clients)  # ask again
 
-                return self.make_bet(json_from_client, client_socket)  # ask again
             elif self.current_player.money >= self.current_bet:
                 self.current_player.bet = self.current_bet  # Call
                 self.current_player.money -= self.current_bet
-                self.current_player.flag = False
                 self.pot = self.pot + self.current_player.bet
                 return self.current_bet
+
             else:
                 self.status = "Not enough money to call. Please choose another option."
                 print("Not enough money to call. Please choose another option.")
 
-                self.send_board_to_client(client_socket)
+                self.send_board_to_all_clients(clients)
                 print("Waiting for " + self.current_player.name + " input")
-                json_from_client = json.loads(client_socket.recv(1024).decode())
+                json_from_client = json.loads(clients.get(self.current_player.name).recv(1024).decode())
 
-                return self.make_bet(json_from_client, client_socket)  # ask again
+                return self.make_bet(json_from_client, clients)  # ask again
+
         elif choice == "all in":
             # All-In
             self.current_player.bet = self.current_player.money
             self.current_player.money = 0
-            self.current_player.flag = True
             self.pot = self.pot + self.current_player.money
             return self.current_player.bet
+
         else:
             print("Invalid choice. Please enter a valid option.")
 
-            self.send_board_to_client(client_socket)
+            self.send_board_to_all_clients(clients)
             print("Waiting for " + self.current_player.name + " input")
-            json_from_client = json.loads(client_socket.recv(1024).decode())
+            json_from_client = json.loads(clients.get(self.current_player.name).recv(1024).decode())
+            return self.make_bet(json_from_client, clients)  # ask again
 
-            return self.make_bet(json_from_client, client_socket)  # ask again
-
-    def collect_bets(self, client_socket):
+    def collect_bets(self, clients):
         players_checked = []
-
         self.minimum_bet = 50
 
         while len(self.players_in_round) > 0:  # Continue until only one player remains in the round
@@ -145,12 +165,13 @@ class Board:
             if self.current_player.money > 0:
                 self.minimum_bet = max(self.current_bet, self.minimum_bet)
 
-                self.send_board_to_client(client_socket)
-                print("Waiting for " + self.current_player.name + " input")
-                message = client_socket.recv(1024).decode()
-                json_from_client = json.loads(message)
+                self.send_board_to_all_clients(clients)
 
-                bet_made = self.make_bet(json_from_client, client_socket)
+                print("Waiting for " + self.current_player.name + " input")
+                message = clients.get(self.current_player.name).recv(1024).decode()
+                print(message)
+                json_from_client = json.loads(message)
+                bet_made = self.make_bet(json_from_client, clients)
 
                 if bet_made != self.current_bet:  # bet or raise (and of course, all in) were made
                     self.minimum_bet = bet_made + 50
@@ -187,8 +208,7 @@ class Board:
             print(f"{player.name}'s hand: {', '.join(str(card) for card in player.hand)}")
 
     def determine_winner(self):
-        # In a real poker game, you would implement hand evaluation logic
-        winning_player = max(self.players, key=lambda player: player.hand[0].rank)
+        winning_player = max(self.players, key=lambda player: player.current_score)
         winning_player.money += self.pot
         self.pot = 0
         return winning_player
@@ -197,7 +217,7 @@ class Board:
         for player in self.players:
             player.draw_hand(self.deck)
 
-    def send_board_to_client(self, client_socket):
+    def send_board_to_all_clients(self, clients):
         data_for_client = {'Community Cards': [],
                            'Players': [],
                            "Current Player": self.current_player.name,
@@ -212,7 +232,8 @@ class Board:
         for player in self.players:
             data_for_client['Players'].append(player.__dict__())
 
-        client_socket.sendall(json.dumps(data_for_client).encode())
+        for client_socket in clients.values():
+            client_socket.sendall(json.dumps(data_for_client).encode())
 
 
 class PokerGameServer:
@@ -225,40 +246,44 @@ class PokerGameServer:
         self.clients = {}
         self.board = None
 
-    def handle_client(self, client_socket, client_address):
+    def handle_client(self, client_socket, client_address, position):
         print(f"Connected by {client_address}")
 
-        try:
-            self.board = Board(["Player1", "Player2", "Player3", "Player4"])
+    def accept_clients(self):
+        while len(self.clients) < 4:
+            client_socket, client_address = self.server_socket.accept()
+            print(f"Connection from {client_address} established.")
+            player_name = json.loads(client_socket.recv(1024).decode())["Player Name"]
+            print(player_name)
+            self.clients[player_name] = client_socket
 
-            while True:
-                self.board.play_round(client_socket)
-
-                # Check if any player is out of money
-                if any(player.money <= 0 for player in self.board.players):
-                    print("Game over!")
-                    break
-
-                for player in self.board.players:
-                    player.bet = 0
-                self.board.current_bet = 0
-                self.board.round_number += 1  # Increment round number
-
-        except ConnectionResetError:
-            print(f"Disconnected by {client_address}")
-        except Exception as e:
-            print(f"Error handling client {client_address}: {str(e)}")
-        finally:
-            del self.clients[client_address]
-            client_socket.close()
+    def get_clients(self):
+        return self.clients
 
     def start(self):
         print("Poker game server started")
-        while True:
-            client_socket, client_address = self.server_socket.accept()
-            self.clients[client_address] = client_socket
-            threading.Thread(target=self.handle_client, args=(client_socket, client_address)).start()
 
+        threading.Thread(target=self.accept_clients).start()
+
+        while True:
+            if len(self.clients) == 4:
+                players = [player_name for player_name in self.clients.keys()]
+                self.board = Board(players)
+
+                while True:
+                    self.board.play_round(self.clients)
+
+                    # Check if any player is out of money
+                    if any(player.money <= 0 for player in self.board.players):
+                        print("Game over!")
+                        break
+
+                    for player in self.board.players:
+                        player.bet = 0
+                    self.board.current_bet = 0
+                    self.board.round_number += 1  # Increment round number
+
+                self.clients.clear()
 
 if __name__ == "__main__":
     server = PokerGameServer("localhost", 8000)
