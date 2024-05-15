@@ -2,7 +2,7 @@ import os
 import random
 import socket
 from threading import Thread
-
+import json.decoder
 import pygame
 import sys
 from collections import deque
@@ -383,7 +383,7 @@ class Game:
             if button.is_clicked():
                 if button.text == 'Bet':
                     if self.current_player == self.player_name:
-                      self.show_bet_options = True
+                        self.show_bet_options = True
                 elif button.text == 'Cancel':
                     self.show_bet_options = False
                     self.bet_text = ''
@@ -450,3 +450,4 @@ class Game:
 if __name__ == "__main__":
     game = Game()
     game.run()
+

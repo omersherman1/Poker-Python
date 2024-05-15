@@ -9,6 +9,7 @@ class Player:
         self.bet = 0
         self.current_best_combination = "None"
         self.current_score= 0
+        self.is_fold= False
         self.profile_path = self.assign_random_profile_path()
 
     def assign_random_profile_path(self):
@@ -50,10 +51,10 @@ class Player:
                 elif card.rank == 'A' and i == 12:
                     arr_number[12]+=1
                 elif isinstance(card.rank, str) and card.rank.isdigit():
-                     if int(card.rank) == i + 2:
+                    if int(card.rank) == i + 2:
                         arr_number[i] += 1
                 elif isinstance(card.rank, int):
-                     if card.rank == i + 2:
+                    if card.rank == i + 2:
                         arr_number[i] += 1
 
         for i in range(13):
@@ -101,13 +102,13 @@ class Player:
         rank_arr.append(-1)
         index = 0
 
-# Convert special ranks to integers
+        # Convert special ranks to integers
         for card in new_arr:
             if   card.rank == 'A':
-                 rank_arr.append(14)
-                 rank_arr[0]= 1
+                rank_arr.append(14)
+                rank_arr[0]= 1
             elif card.rank == 'K':
-                 rank_arr.append(13)
+                rank_arr.append(13)
             elif card.rank == 'Q':
                 rank_arr.append(12)
             elif card.rank == 'J':
@@ -117,7 +118,7 @@ class Player:
 
         rank_arr.sort()
 
-# Check for straight
+        # Check for straight
         for i in range(len(rank_arr) - 1):
             if rank_arr[i] + 1 == rank_arr[i + 1]:
                 index += 1

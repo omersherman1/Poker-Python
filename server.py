@@ -23,25 +23,26 @@ class Board:
             self.players.append(Player(name))
 
     def play_round(self, clients):
-        self.players_in_round = deque([player for player in self.players if player.money > 0])
-
+        self.players_in_round = deque([player for player in self.players if player.money > 0 and player.is_fold!= True])
         print(f"\n--- Round {self.round_number} ---")
 
         if self.round_number == 1:
             self.deal_initial_hands()
         self.evaluate_all_hands()
-
         while not len(self.players_in_round) == 0:
             if self.round_number == 2:
                 print("\n--- Flop ---")
                 self.deal_flop()
+                self.evaluate_all_hands()
             elif self.round_number == 3:
                 print("\n--- Turn ---")
                 self.deal_turn()
+                self.evaluate_all_hands()
 
             elif self.round_number == 4:
                 print("\n--- River ---")
                 self.deal_river()
+                self.evaluate_all_hands()
 
             self.display_board()
             self.collect_bets(clients)
@@ -79,6 +80,7 @@ class Board:
 
         if choice == "fold":
             # Fold
+            self.current_player.is_fold = True
             self.current_player.bet = 0
             return 0
 
@@ -208,6 +210,7 @@ class Board:
             print(f"{player.name}'s hand: {', '.join(str(card) for card in player.hand)}")
 
     def determine_winner(self):
+        active_players = [player for player in self.players if not player.fold]
         winning_player = max(self.players, key=lambda player: player.current_score)
         winning_player.money += self.pot
         self.pot = 0
