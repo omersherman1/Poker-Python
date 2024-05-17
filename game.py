@@ -213,7 +213,7 @@ class Game:
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
         pygame.display.set_caption("Poker Game")
 
-        self.cloud_background = pygame.transform.scale(pygame.image.load(r'clouds.jpg'),
+        self.cloud_background = pygame.transform.scale(pygame.image.load(r'img_poker\clouds.jpg'),
                                                        (self.screen_width, self.screen_height))
         self.last_bet_amount = 0
         self.bet_amount = 0
